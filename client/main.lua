@@ -73,6 +73,12 @@ end
 
 ---Opens the appearance editor for a new character and saves the result
 local function openCustomization(res)
+    -- Arca's illenium-appearance fork handles new characters itself (starter clothes, routing bucket, saving)
+    if GetResourceMetadata(res, 'arca_support', 0) == 'yes' then
+        TriggerEvent('illenium-appearance:client:arcaCreateFirstCharacter')
+        return
+    end
+
     exports[res]:startPlayerCustomization(function(appearance)
         -- allowExit can be enabled in config; fall back to whatever the ped is wearing
         appearance = appearance or exports[res]:getPedAppearance(PlayerPedId())
