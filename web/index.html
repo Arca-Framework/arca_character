@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app" class="hidden">
+        <div class="panel">
+            <h1>ARCA</h1>
+            <p class="sub">Select a character</p>
+            <div id="slots"></div>
+        </div>
+
+        <div id="create" class="modal hidden">
+            <form class="card" id="create-form">
+                <h2>New Character</h2>
+                <div class="row">
+                    <label>First name<input name="firstname" maxlength="24" required></label>
+                    <label>Last name<input name="lastname" maxlength="24" required></label>
+                </div>
+                <label>Date of birth<input name="birthdate" type="date" required></label>
+                <div class="row">
+                    <label>Gender
+                        <select name="gender">
+                            <option value="0">Male</option>
+                            <option value="1">Female</option>
+                        </select>
+                    </label>
+                    <label>Nationality<select name="nationality" id="nationality"></select></label>
+                </div>
+                <div class="error" id="create-error"></div>
+                <div class="actions">
+                    <button type="button" class="btn ghost" id="create-cancel">Cancel</button>
+                    <button type="submit" class="btn primary">Create</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="confirm" class="modal hidden">
+            <div class="card">
+                <h2>Delete character?</h2>
+                <p id="confirm-text"></p>
+                <div class="actions">
+                    <button class="btn ghost" id="confirm-cancel">Cancel</button>
+                    <button class="btn danger" id="confirm-ok">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
