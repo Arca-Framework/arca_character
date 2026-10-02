@@ -1,12 +1,14 @@
 CharConfig = {
-    -- where the (hidden) player waits while choosing a character
-    HiddenCoords = vector4(-1355.9, -1487.8, 520.7, 0.0),
-
-    -- scenic camera shown behind the menu
-    Camera = {
-        coords = vector3(-1355.9, -1487.8, 520.7),
-        pointAt = vector3(-280.0, -1000.0, 200.0),
-        fov = 50.0,
+    -- Selection scene: the preview ped stands at Ped, the camera films it from Camera.
+    -- Default is the living room of Michael's house (always loaded, no IPL needed).
+    Scene = {
+        ped = vector4(-813.97, 176.22, 76.74, -7.5),
+        camera = vector3(-813.40, 179.10, 76.95),
+        lookAt = vector3(-813.97, 176.22, 76.55),
+        fov = 48.0,
+        hour = 12,
+        -- idle animation for the preview ped
+        anim = { dict = 'anim@heists@heist_corona@single_team', clip = 'single_team_loop_boss' },
     },
 
     -- hand off to arca_spawn (event 'arca_spawn:client:open') instead of spawning at last position

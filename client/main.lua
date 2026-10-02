@@ -1,18 +1,21 @@
 local cam
 local isOpen = false
+local previewPed
+local previewToken = 0 -- bumps on every preview change so slow loads don't overwrite newer ones
 
 local function hidePlayer(state)
     local ped = PlayerPedId()
     SetEntityVisible(ped, not state, false)
     FreezeEntityPosition(ped, state)
     SetEntityInvincible(ped, state)
+    SetEntityCollision(ped, not state, not state)
     SetPlayerControl(PlayerId(), not state, 0)
 end
 
 local function createCamera()
-    local c = CharConfig.Camera
-    cam = CreateCamWithParams('DEFAULT_SCRIPTED_CAMERA', c.coords.x, c.coords.y, c.coords.z, 0.0, 0.0, 0.0, c.fov, false, 2)
-    PointCamAtCoord(cam, c.pointAt.x, c.pointAt.y, c.pointAt.z)
+    local s = CharConfig.Scene
+    cam = CreateCamWithParams('DEFAULT_SCRIPTED_CAMERA', s.camera.x, s.camera.y, s.camera.z, 0.0, 0.0, 0.0, s.fov, false, 2)
+    PointCamAtCoord(cam, s.lookAt.x, s.lookAt.y, s.lookAt.z)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
 end
@@ -24,6 +27,68 @@ local function destroyCamera()
     cam = nil
 end
 
+local function appearanceResource()
+    local res = CharConfig.Appearance.Resource
+    return GetResourceState(res) == 'started' and res or nil
+end
+
+---------------------------------------------------------------------
+-- Preview ped
+---------------------------------------------------------------------
+local function deletePreview()
+    if previewPed and DoesEntityExist(previewPed) then DeleteEntity(previewPed) end
+    previewPed = nil
+end
+
+local function loadModel(model)
+    model = type(model) == 'string' and joaat(model) or model
+    if not IsModelInCdimage(model) then return nil end
+    RequestModel(model)
+    local timeout = GetGameTimer() + 5000
+    while not HasModelLoaded(model) and GetGameTimer() < timeout do Wait(0) end
+    return HasModelLoaded(model) and model or nil
+end
+
+---Shows a character (or a blank male/female for new slots) standing in the scene
+---@param gender number
+---@param skin table|nil illenium-appearance data
+local function showPreview(gender, skin)
+    previewToken = previewToken + 1
+    local token = previewToken
+
+    local model = loadModel(skin and skin.model or CharConfig.Models[gender] or CharConfig.Models[0])
+    if not model or token ~= previewToken then return end
+
+    deletePreview()
+    local p = CharConfig.Scene.ped
+    local ped = CreatePed(4, model, p.x, p.y, p.z - 0.98, p.w, false, true)
+    SetModelAsNoLongerNeeded(model)
+    SetEntityInvincible(ped, true)
+    FreezeEntityPosition(ped, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    previewPed = ped
+
+    local res = appearanceResource()
+    if skin and res then
+        exports[res]:setPedAppearance(ped, skin)
+    else
+        SetPedDefaultComponentVariation(ped)
+    end
+
+    local anim = CharConfig.Scene.anim
+    if anim then
+        RequestAnimDict(anim.dict)
+        local timeout = GetGameTimer() + 3000
+        while not HasAnimDictLoaded(anim.dict) and GetGameTimer() < timeout do Wait(0) end
+        if DoesEntityExist(ped) then
+            TaskPlayAnim(ped, anim.dict, anim.clip, 2.0, 2.0, -1, 1, 0, false, false, false)
+        end
+    end
+end
+
+---------------------------------------------------------------------
+-- Selection screen
+---------------------------------------------------------------------
 local function refresh()
     local characters, maxSlots, nationalities = Arca.Callback.Await('arca_character:getCharacters')
     SendNUIMessage({
@@ -39,12 +104,18 @@ local function openSelection()
     DoScreenFadeOut(250)
     while not IsScreenFadedOut() do Wait(0) end
 
-    local h = CharConfig.HiddenCoords
+    -- park the hidden player inside the scene so the interior streams in
+    local p = CharConfig.Scene.camera
     local ped = PlayerPedId()
-    SetEntityCoords(ped, h.x, h.y, h.z, false, false, false, false)
+    SetEntityCoords(ped, p.x, p.y, p.z - 1.0, false, false, false, false)
     hidePlayer(true)
-    createCamera()
+    DisplayRadar(false)
+    NetworkOverrideClockTime(CharConfig.Scene.hour or 12, 0, 0)
 
+    local timeout = GetGameTimer() + 4000
+    while not HasCollisionLoadedAroundEntity(ped) and GetGameTimer() < timeout do Wait(0) end
+
+    createCamera()
     refresh()
     SetNuiFocus(true, true)
     DoScreenFadeIn(500)
@@ -52,8 +123,11 @@ end
 
 local function closeSelection()
     isOpen = false
+    previewToken = previewToken + 1
+    deletePreview()
     SendNUIMessage({ action = 'close' })
     SetNuiFocus(false, false)
+    NetworkClearClockTimeOverride()
 end
 
 local function applyModel(gender)
@@ -64,11 +138,6 @@ local function applyModel(gender)
     SetPlayerModel(PlayerId(), model)
     SetPedDefaultComponentVariation(PlayerPedId())
     SetModelAsNoLongerNeeded(model)
-end
-
-local function appearanceResource()
-    local res = CharConfig.Appearance.Resource
-    return GetResourceState(res) == 'started' and res or nil
 end
 
 ---Opens the appearance editor for a new character and saves the result
@@ -136,6 +205,16 @@ end)
 ---------------------------------------------------------------------
 -- NUI
 ---------------------------------------------------------------------
+RegisterNUICallback('preview', function(data, cb)
+    cb(1)
+    if data.citizenid then
+        local info = Arca.Callback.Await('arca_character:getPreview', data.citizenid)
+        if isOpen and info then showPreview(info.gender, info.skin) end
+    else
+        showPreview(tonumber(data.gender) or 0, nil)
+    end
+end)
+
 RegisterNUICallback('select', function(data, cb)
     local ok = Arca.Callback.Await('arca_character:select', data.citizenid)
     cb({ ok = ok })
@@ -170,6 +249,7 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() or not isOpen then return end
+    deletePreview()
     destroyCamera()
     SetNuiFocus(false, false)
     hidePlayer(false)

@@ -114,3 +114,14 @@ end)
 AddEventHandler('arca_core:server:characterDeleted', function(_, citizenid)
     MySQL.update('DELETE FROM playerskins WHERE citizenid = ?', { citizenid })
 end)
+
+-- Skin + gender for the 3D preview on the selection screen (only for the caller's own characters)
+Arca.Callback.Register('arca_character:getPreview', function(source, citizenid)
+    if type(citizenid) ~= 'string' then return nil end
+    local license = GetPlayerIdentifierByType(tostring(source), 'license')
+    local row = MySQL.single.await('SELECT charinfo FROM players WHERE citizenid = ? AND license = ?', { citizenid, license })
+    if not row then return nil end
+    local charinfo = json.decode(row.charinfo) or {}
+    local skin = MySQL.scalar.await('SELECT skin FROM playerskins WHERE citizenid = ? AND active = 1 LIMIT 1', { citizenid })
+    return { gender = charinfo.gender or 0, skin = skin and json.decode(skin) or nil }
+end)

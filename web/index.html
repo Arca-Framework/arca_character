@@ -2,49 +2,102 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app" class="hidden">
-        <div class="panel">
-            <h1>ARCA</h1>
-            <p class="sub">Select a character</p>
+        <div class="vignette"></div>
+
+        <!-- left: character list -->
+        <section class="side left">
+            <header class="title">
+                <span>Character</span>
+                <h1>Selector</h1>
+            </header>
             <div id="slots"></div>
-        </div>
+        </section>
 
-        <div id="create" class="modal hidden">
-            <form class="card" id="create-form">
-                <h2>New Character</h2>
-                <div class="row">
-                    <label>First name<input name="firstname" maxlength="24" required></label>
-                    <label>Last name<input name="lastname" maxlength="24" required></label>
+        <!-- right: details or creation -->
+        <section class="side right">
+            <!-- existing character -->
+            <div id="details" class="hidden">
+                <header class="title right-title">
+                    <span>Character</span>
+                    <h1>Details</h1>
+                </header>
+                <div class="panel">
+                    <div class="d-name" id="d-name"></div>
+                    <div class="d-id" id="d-id"></div>
+                    <div class="d-grid">
+                        <div><label>Date of birth</label><strong id="d-dob"></strong></div>
+                        <div><label>Gender</label><strong id="d-gender"></strong></div>
+                        <div><label>Nationality</label><strong id="d-nat"></strong></div>
+                        <div><label>Job</label><strong id="d-job"></strong></div>
+                        <div><label>Cash</label><strong id="d-cash" class="money"></strong></div>
+                        <div><label>Bank</label><strong id="d-bank" class="money"></strong></div>
+                    </div>
                 </div>
-                <label>Date of birth<input name="birthdate" type="date" required></label>
-                <div class="row">
-                    <label>Gender
-                        <select name="gender">
-                            <option value="0">Male</option>
-                            <option value="1">Female</option>
-                        </select>
-                    </label>
-                    <label>Nationality<select name="nationality" id="nationality"></select></label>
-                </div>
-                <div class="error" id="create-error"></div>
                 <div class="actions">
-                    <button type="button" class="btn ghost" id="create-cancel">Cancel</button>
-                    <button type="submit" class="btn primary">Create</button>
+                    <button class="btn play" id="play"><i class="fa-solid fa-play"></i> Play</button>
+                    <button class="btn danger" id="delete" title="Delete character"><i class="fa-solid fa-trash"></i></button>
                 </div>
-            </form>
-        </div>
+            </div>
 
+            <!-- new character -->
+            <form id="create" class="hidden" autocomplete="off">
+                <header class="title right-title">
+                    <span>Character</span>
+                    <h1>Creation</h1>
+                </header>
+                <p class="hint">Enter the details of the character you want to create.</p>
+
+                <div class="steps">
+                    <div class="step">
+                        <div class="gender">
+                            <button type="button" class="g-btn active" data-gender="0"><i class="fa-solid fa-mars"></i> Male</button>
+                            <button type="button" class="g-btn" data-gender="1"><i class="fa-solid fa-venus"></i> Female</button>
+                        </div>
+                        <span class="num">1</span>
+                    </div>
+                    <div class="step">
+                        <label class="field"><span>First name <em>(max 24)</em></span><input name="firstname" maxlength="24" placeholder="Enter your first name" required></label>
+                        <span class="num">2</span>
+                    </div>
+                    <div class="step">
+                        <label class="field"><span>Last name <em>(max 24)</em></span><input name="lastname" maxlength="24" placeholder="Enter your last name" required></label>
+                        <span class="num">3</span>
+                    </div>
+                    <div class="step">
+                        <label class="field"><span>Nationality</span><select name="nationality" id="nationality"></select></label>
+                        <span class="num">4</span>
+                    </div>
+                    <div class="step">
+                        <label class="field inline"><span>Date of birth</span><input name="birthdate" type="date" required></label>
+                        <span class="num">5</span>
+                    </div>
+                </div>
+
+                <div class="error" id="create-error"></div>
+                <button type="submit" class="btn create"><i class="fa-solid fa-plus"></i> Create</button>
+            </form>
+        </section>
+
+        <footer class="bottom-hint">
+            <span><kbd>Click</kbd> a slot to preview</span>
+        </footer>
+
+        <!-- delete confirm -->
         <div id="confirm" class="modal hidden">
-            <div class="card">
+            <div class="modal-card">
+                <i class="fa-solid fa-triangle-exclamation"></i>
                 <h2>Delete character?</h2>
                 <p id="confirm-text"></p>
-                <div class="actions">
+                <div class="modal-actions">
                     <button class="btn ghost" id="confirm-cancel">Cancel</button>
-                    <button class="btn danger" id="confirm-ok">Delete</button>
+                    <button class="btn danger wide" id="confirm-ok">Delete</button>
                 </div>
             </div>
         </div>
