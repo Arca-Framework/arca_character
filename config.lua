@@ -13,7 +13,7 @@ CharConfig = {
     },
 
     -- hand off to arca_spawn (event 'arca_spawn:client:open') instead of spawning at last position
-    UseSpawnSelector = false,
+    UseSpawnSelector = true,  -- falls back to last position when arca_spawn isn't running
 
     -- Clothing / appearance. Used automatically when the resource is started.
     Appearance = {
