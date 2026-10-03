@@ -12,13 +12,24 @@ local function hidePlayer(state)
     SetPlayerControl(PlayerId(), not state, 0)
 end
 
+-- the preview ped's waist height, measured from the real floor once the scene has loaded
+-- (the configured z can be a little off, which made the ped settle and the camera re-aim)
+local waistZ
+
+local function findWaist()
+    local p = CharConfig.Scene.ped
+    local ok, ground = GetGroundZFor_3dCoord(p.x, p.y, p.z + 1.0, false)
+    waistZ = (ok and math.abs(ground - p.z) < 3.0) and (ground + 1.0) or p.z
+end
+
 ---Camera in front of the scene ped, looking at its waist
 local function sceneCamera()
     local s = CharConfig.Scene
+    local z = waistZ or s.ped.z
     local h = math.rad(s.ped.w)
     local forward = vec3(-math.sin(h), math.cos(h), 0.0)
-    local pos = vec3(s.ped.x, s.ped.y, s.ped.z) + forward * s.distance
-    return vec3(pos.x, pos.y, s.ped.z + s.height), vec3(s.ped.x, s.ped.y, s.ped.z)
+    local pos = vec3(s.ped.x, s.ped.y, z) + forward * s.distance
+    return vec3(pos.x, pos.y, z + s.height), vec3(s.ped.x, s.ped.y, z)
 end
 
 local function createCamera()
@@ -53,8 +64,12 @@ local function loadModel(model)
     model = type(model) == 'string' and joaat(model) or model
     if not IsModelInCdimage(model) then return nil end
     RequestModel(model)
-    local timeout = GetGameTimer() + 5000
-    while not HasModelLoaded(model) and GetGameTimer() < timeout do Wait(0) end
+    -- streaming can be slow right after joining, so give it time before giving up
+    local timeout = GetGameTimer() + 15000
+    while not HasModelLoaded(model) and GetGameTimer() < timeout do
+        RequestModel(model)
+        Wait(50)
+    end
     return HasModelLoaded(model) and model or nil
 end
 
@@ -77,8 +92,8 @@ local function showPreview(gender, skin)
     local p = CharConfig.Scene.ped
     RequestCollisionAtCoord(p.x, p.y, p.z)
 
-    -- spawn slightly above the floor and let it settle, so a wrong z can't bury it
-    local ped = CreatePed(2, model, p.x, p.y, p.z, p.w, false, true)
+    -- a ped's position is its waist: put it 1m above the measured floor so it doesn't drop or pop up
+    local ped = CreatePed(2, model, p.x, p.y, waistZ or p.z, p.w, false, true)
     SetModelAsNoLongerNeeded(model)
     if not DoesEntityExist(ped) then
         print('^1[arca_character] failed to create preview ped^7')
@@ -108,18 +123,12 @@ local function showPreview(gender, skin)
         while not HasAnimDictLoaded(anim.dict) and GetGameTimer() < timeout do Wait(0) end
     end
 
-    Wait(300)
     if token ~= previewToken or not DoesEntityExist(ped) then return end
     FreezeEntityPosition(ped, true)
     if anim and HasAnimDictLoaded(anim.dict) then
         TaskPlayAnim(ped, anim.dict, anim.clip, 2.0, 2.0, -1, 1, 0, false, false, false)
     end
-
-    -- aim the camera at where the ped actually ended up
-    if cam then
-        local c = GetEntityCoords(ped)
-        PointCamAtCoord(cam, c.x, c.y, c.z)
-    end
+    -- the camera stays where it is: every character is framed the same way
 end
 
 ---------------------------------------------------------------------
@@ -151,6 +160,7 @@ local function openSelection()
     local timeout = GetGameTimer() + 4000
     while not HasCollisionLoadedAroundEntity(ped) and GetGameTimer() < timeout do Wait(0) end
 
+    findWaist()
     createCamera()
     refresh()
     SetNuiFocus(true, true)
