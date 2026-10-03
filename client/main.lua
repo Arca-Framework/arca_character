@@ -12,10 +12,19 @@ local function hidePlayer(state)
     SetPlayerControl(PlayerId(), not state, 0)
 end
 
-local function createCamera()
+---Camera in front of the scene ped, looking at its waist
+local function sceneCamera()
     local s = CharConfig.Scene
-    cam = CreateCamWithParams('DEFAULT_SCRIPTED_CAMERA', s.camera.x, s.camera.y, s.camera.z, 0.0, 0.0, 0.0, s.fov, false, 2)
-    PointCamAtCoord(cam, s.lookAt.x, s.lookAt.y, s.lookAt.z)
+    local h = math.rad(s.ped.w)
+    local forward = vec3(-math.sin(h), math.cos(h), 0.0)
+    local pos = vec3(s.ped.x, s.ped.y, s.ped.z) + forward * s.distance
+    return vec3(pos.x, pos.y, s.ped.z + s.height), vec3(s.ped.x, s.ped.y, s.ped.z)
+end
+
+local function createCamera()
+    local pos, target = sceneCamera()
+    cam = CreateCamWithParams('DEFAULT_SCRIPTED_CAMERA', pos.x, pos.y, pos.z, 0.0, 0.0, 0.0, CharConfig.Scene.fov, false, 2)
+    PointCamAtCoord(cam, target.x, target.y, target.z)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
 end
@@ -57,20 +66,37 @@ local function showPreview(gender, skin)
     local token = previewToken
 
     local model = loadModel(skin and skin.model or CharConfig.Models[gender] or CharConfig.Models[0])
+    if not model then
+        print(('^3[arca_character] could not load preview model %s^7'):format(tostring(skin and skin.model or gender)))
+        model = loadModel(CharConfig.Models[gender] or CharConfig.Models[0])
+        skin = nil
+    end
     if not model or token ~= previewToken then return end
 
     deletePreview()
     local p = CharConfig.Scene.ped
-    local ped = CreatePed(4, model, p.x, p.y, p.z - 0.98, p.w, false, true)
+    RequestCollisionAtCoord(p.x, p.y, p.z)
+
+    -- spawn slightly above the floor and let it settle, so a wrong z can't bury it
+    local ped = CreatePed(2, model, p.x, p.y, p.z, p.w, false, true)
     SetModelAsNoLongerNeeded(model)
-    SetEntityInvincible(ped, true)
-    FreezeEntityPosition(ped, true)
-    SetBlockingOfNonTemporaryEvents(ped, true)
+    if not DoesEntityExist(ped) then
+        print('^1[arca_character] failed to create preview ped^7')
+        return
+    end
     previewPed = ped
+    SetEntityHeading(ped, p.w)
+    SetEntityInvincible(ped, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    SetPedCanRagdoll(ped, false)
 
     local res = appearanceResource()
     if skin and res then
-        exports[res]:setPedAppearance(ped, skin)
+        local ok, err = pcall(function() exports[res]:setPedAppearance(ped, skin) end)
+        if not ok then
+            print(('^3[arca_character] setPedAppearance failed: %s^7'):format(err))
+            SetPedDefaultComponentVariation(ped)
+        end
     else
         SetPedDefaultComponentVariation(ped)
     end
@@ -80,9 +106,19 @@ local function showPreview(gender, skin)
         RequestAnimDict(anim.dict)
         local timeout = GetGameTimer() + 3000
         while not HasAnimDictLoaded(anim.dict) and GetGameTimer() < timeout do Wait(0) end
-        if DoesEntityExist(ped) then
-            TaskPlayAnim(ped, anim.dict, anim.clip, 2.0, 2.0, -1, 1, 0, false, false, false)
-        end
+    end
+
+    Wait(300)
+    if token ~= previewToken or not DoesEntityExist(ped) then return end
+    FreezeEntityPosition(ped, true)
+    if anim and HasAnimDictLoaded(anim.dict) then
+        TaskPlayAnim(ped, anim.dict, anim.clip, 2.0, 2.0, -1, 1, 0, false, false, false)
+    end
+
+    -- aim the camera at where the ped actually ended up
+    if cam then
+        local c = GetEntityCoords(ped)
+        PointCamAtCoord(cam, c.x, c.y, c.z)
     end
 end
 
@@ -105,7 +141,7 @@ local function openSelection()
     while not IsScreenFadedOut() do Wait(0) end
 
     -- park the hidden player inside the scene so the interior streams in
-    local p = CharConfig.Scene.camera
+    local p = sceneCamera()
     local ped = PlayerPedId()
     SetEntityCoords(ped, p.x, p.y, p.z - 1.0, false, false, false, false)
     hidePlayer(true)
@@ -209,7 +245,8 @@ RegisterNUICallback('preview', function(data, cb)
     cb(1)
     if data.citizenid then
         local info = Arca.Callback.Await('arca_character:getPreview', data.citizenid)
-        if isOpen and info then showPreview(info.gender, info.skin) end
+        if not info then print('^3[arca_character] no preview data for ' .. tostring(data.citizenid) .. '^7') end
+        if isOpen then showPreview(info and info.gender or 0, info and info.skin) end
     else
         showPreview(tonumber(data.gender) or 0, nil)
     end
