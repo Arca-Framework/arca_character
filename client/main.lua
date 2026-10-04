@@ -92,8 +92,9 @@ local function showPreview(gender, skin)
     local p = CharConfig.Scene.ped
     RequestCollisionAtCoord(p.x, p.y, p.z)
 
-    -- a ped's position is its waist: put it 1m above the measured floor so it doesn't drop or pop up
-    local ped = CreatePed(2, model, p.x, p.y, waistZ or p.z, p.w, false, true)
+    -- CreatePed takes the floor height (feet), unlike GetEntityCoords which reports the waist;
+    -- spawning at waist height left the frozen ped floating 1m up with its head out of frame
+    local ped = CreatePed(2, model, p.x, p.y, (waistZ or p.z) - 1.0, p.w, false, true)
     SetModelAsNoLongerNeeded(model)
     if not DoesEntityExist(ped) then
         print('^1[arca_character] failed to create preview ped^7')
